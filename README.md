@@ -5,24 +5,23 @@ A compatibility fix that makes the EpicMMO mod's user interface properly visible
 ## Features
 
 - Makes EpicMMO's level UI visible in VR
-- Ensures enemy and player level displays work correctly in VR
+- Ensures enemy level displays work correctly in VR
 - Maintains all EpicMMO functionality
 - Non-intrusive - doesn't modify original EpicMMO files
 
 ## Installation
 
 1. Install [BepInEx](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/)
-2. Install [Valheim VR Mod (VHVR)](https://valheim.thunderstore.io/package/ValheimVRMod/ValheimVRMod/)
+2. Install [Valheim VR Mod (VHVR)
 3. Install [EpicMMO](https://valheim.thunderstore.io/package/ASharpPen/EpicMMOSystem/)
 4. Install this mod
 
 ## Usage
 
 The mod works automatically! Once installed:
-- Press `L` to open the EpicMMO level UI (centered in VR view)
+- Press `Inventory` to open the EpicMMO level UI
 - Enemy levels will display above their heads in VR
-- Player level displays will work correctly
-
+- 
 ## How it Works
 
 This mod acts as a bridge between EpicMMO and Valheim VR Mod (VHVR). It detects when EpicMMO UI elements are shown and ensures they're properly processed by VHVR's VR rendering system for correct positioning and visibility.
