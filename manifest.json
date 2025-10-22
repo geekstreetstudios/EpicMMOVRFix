@@ -1,0 +1,16 @@
+{
+  "name": "EpicMMOVRFix",
+  "version_number": "1.0.0",
+  "website_url": "https://github.com/geekstreetstudios/EpicMMOVRFix/",
+  "description": "VR compatibility fix for EpicMMO mod - makes the level UI and HUD elements properly visible in Valheim VR",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333",
+    "EpicMMOSystem-1.5.11"
+  ]
+  "namespace": "EpicMMOVRFix",
+  "authors": [
+    {
+      "name": "enifleR",
+      "url": "https://github.com/geekstreetstudios"
+    }
+}
