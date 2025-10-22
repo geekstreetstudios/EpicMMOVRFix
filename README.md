@@ -13,7 +13,7 @@ A compatibility fix that makes the EpicMMO mod's user interface properly visible
 
 1. Install [BepInEx](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/)
 2. Install [Valheim VR Mod (VHVR)
-3. Install [EpicMMO](https://valheim.thunderstore.io/package/ASharpPen/EpicMMOSystem/)
+3. Install [EpicMMO](https://thunderstore.io/c/valheim/p/WackyMole/WackyEpicMMOSystem/)
 4. Install this mod
 
 ## Usage
@@ -55,6 +55,6 @@ Available on [GitHub](https://github.com/geekstreetstudios/EpicMMOVRFix)
 
 ## Credits
 
-- Thanks to ASharpPen for EpicMMO
+- Thanks to WackyMole for EpicMMO
 - Thanks to the Valheim VR Mod team
 - Thanks to the Valheim modding community
