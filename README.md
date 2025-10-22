@@ -52,7 +52,7 @@ If UI elements don't appear:
 
 ## Source Code
 
-Available on [GitHub](https://github.com/YourUsername/EpicMMOVRFix)
+Available on [GitHub](https://github.com/geekstreetstudios/EpicMMOVRFix)
 
 ## Credits
 
