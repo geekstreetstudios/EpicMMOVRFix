@@ -21,7 +21,7 @@ A compatibility fix that makes the EpicMMO mod's user interface properly visible
 The mod works automatically! Once installed:
 - Press `Inventory` to open the EpicMMO level UI
 - Enemy levels will display above their heads in VR
-- 
+- Force Old-XP bar should be enabled in EpicMMO
 ## How it Works
 
 This mod acts as a bridge between EpicMMO and Valheim VR Mod (VHVR). It detects when EpicMMO UI elements are shown and ensures they're properly processed by VHVR's VR rendering system for correct positioning and visibility.
@@ -34,6 +34,7 @@ This mod acts as a bridge between EpicMMO and Valheim VR Mod (VHVR). It detects 
 
 ## Known Issues
 - Other players level may not appear
+- The XP bar is fixed in the lower left corner
 
 ## Configuration
 
