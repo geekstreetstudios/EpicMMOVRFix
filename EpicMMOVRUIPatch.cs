@@ -1,108 +1,167 @@
 ﻿using System;
 using System.Collections;
-using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Configuration;
-using EpicMMO;
 using HarmonyLib;
 using UnityEngine;
+using EpicMMO;
 
-[BepInEx.BepInPlugin("epicmmovrfix", "EpicMMO VR UI Fix", "1.0.0")]
-[BepInEx.BepInDependency("ValheimVRMod", BepInEx.BepInDependency.DependencyFlags.SoftDependency)]
-[BepInEx.BepInDependency("EpicMMOSystem", BepInEx.BepInDependency.DependencyFlags.SoftDependency)]
+[BepInPlugin("epicmmovrfix", "EpicMMO VR UI Fix", "1.2.0")]
+[BepInDependency("ValheimVRMod", BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency("EpicMMOSystem", BepInDependency.DependencyFlags.SoftDependency)]
 public class EpicMMOVRUIPatch : BaseUnityPlugin
 {
     private static EpicMMOVRUIPatch _instance;
     private Harmony _harmony;
-    private bool _epicMMOLoaded = false;
+    private bool _epicLoaded;
 
-    // Configuration settings
+    public static EpicMMOVRUIPatch Instance => _instance;
+
     public static ConfigEntry<bool> ConfigEnableMod { get; private set; }
     public static ConfigEntry<bool> ConfigEnableLogs { get; private set; }
 
-    public static EpicMMOVRUIPatch Instance => _instance;
+    public static ConfigEntry<bool> ConfigEnableInventoryXPBar { get; private set; }
+
+    public static ConfigEntry<float> ConfigInventoryXPBarPosX { get; private set; }
+    public static ConfigEntry<float> ConfigInventoryXPBarPosY { get; private set; }
+    public static ConfigEntry<float> ConfigInventoryXPBarScale { get; private set; }
+
+    public static ConfigEntry<float> ConfigHudXPBarPosX { get; private set; }
+    public static ConfigEntry<float> ConfigHudXPBarPosY { get; private set; }
+    public static ConfigEntry<float> ConfigHudXPBarScale { get; private set; }
 
     private void Awake()
     {
         _instance = this;
 
-        // Initialize configuration
-        ConfigEnableMod = Config.Bind("General", "EnableMod", true,
-            "Enable the EpicMMO VR UI Fix mod");
-        ConfigEnableLogs = Config.Bind("General", "EnableLogs", false,
-            "Enable debug logging for the EpicMMO VR UI Fix mod");
+        ConfigEnableMod = Config.Bind(
+            "General",
+            "EnableMod",
+            true,
+            "Enable EpicMMO VR UI Fix"
+        );
+
+        ConfigEnableLogs = Config.Bind(
+            "General",
+            "EnableLogs",
+            false,
+            "Enable debug logging"
+        );
+
+        ConfigEnableInventoryXPBar = Config.Bind(
+            "XP Bar",
+            "EnableInventoryXPBar",
+            true,
+            "Move EpicMMO XP bar into inventory while inventory is open"
+        );
+
+        ConfigInventoryXPBarPosX = Config.Bind(
+            "XP Bar",
+            "InventoryXPBarPosX",
+            500f,
+            "Inventory XP bar X position"
+        );
+
+        ConfigInventoryXPBarPosY = Config.Bind(
+            "XP Bar",
+            "InventoryXPBarPosY",
+            750f,
+            "Inventory XP bar Y position"
+        );
+
+        ConfigInventoryXPBarScale = Config.Bind(
+            "XP Bar",
+            "InventoryXPBarScale",
+            0.90f,
+            "Inventory XP bar scale"
+        );
+
+        ConfigHudXPBarPosX = Config.Bind(
+            "XP Bar",
+            "HudXPBarPosX",
+            -550f,
+            "HUD XP bar X position"
+        );
+
+        ConfigHudXPBarPosY = Config.Bind(
+            "XP Bar",
+            "HudXPBarPosY",
+            -950f,
+            "HUD XP bar Y position"
+        );
+
+        ConfigHudXPBarScale = Config.Bind(
+            "XP Bar",
+            "HudXPBarScale",
+            0.5f,
+            "HUD XP bar scale"
+        );
 
         try
         {
-            // Create Harmony instance
             _harmony = new Harmony("epicmmovrfix");
 
-            // Start coroutine to wait for EpicMMOSystem to load
-            StartCoroutine(WaitForEpicMMOSystem());
+            ConfigEnableInventoryXPBar.SettingChanged += ConfigChanged;
+            ConfigInventoryXPBarPosX.SettingChanged += ConfigChanged;
+            ConfigInventoryXPBarPosY.SettingChanged += ConfigChanged;
+            ConfigInventoryXPBarScale.SettingChanged += ConfigChanged;
 
-            Logger.LogInfo("EpicMMO VR UI Fix loaded successfully!");
+            ConfigHudXPBarPosX.SettingChanged += ConfigChanged;
+            ConfigHudXPBarPosY.SettingChanged += ConfigChanged;
+            ConfigHudXPBarScale.SettingChanged += ConfigChanged;
+
+            StartCoroutine(WaitForEpicMMO());
+
+            Logger.LogInfo("EpicMMO VR UI Fix loaded");
         }
         catch (Exception e)
         {
-            Logger.LogError($"Failed to load EpicMMO VR UI Fix: {e}");
+            Logger.LogError($"Load failed: {e}");
         }
     }
 
-    private IEnumerator WaitForEpicMMOSystem()
+    private void ConfigChanged(object sender, EventArgs e)
+    {
+        EpicMMOVRXPBar.ApplyCurrentMode();
+    }
+
+    private IEnumerator WaitForEpicMMO()
     {
         if (!ConfigEnableMod.Value)
-        {
-            Logger.LogInfo("EpicMMO VR UI Fix is disabled in configuration");
             yield break;
-        }
 
-        int maxAttempts = 60; // 60 seconds max
-        int attempts = 0;
+        int tries = 0;
 
-        while (attempts < maxAttempts && !_epicMMOLoaded)
+        while (!_epicLoaded && tries < 60)
         {
             yield return new WaitForSeconds(1f);
-            attempts++;
+            tries++;
 
-            // Check if EpicMMOSystem is now loaded
             if (EpicMMOVRUI.IsEpicMMOSystemLoaded())
             {
-                _epicMMOLoaded = true;
+                _epicLoaded = true;
                 ApplyPatches();
-
-                if (ConfigEnableLogs.Value)
-                    Logger.LogInfo("EpicMMOSystem detected, patches applied!");
                 yield break;
             }
-
-            if (attempts % 10 == 0 && ConfigEnableLogs.Value) // Log every 10 seconds
-            {
-                Logger.LogInfo($"Waiting for EpicMMOSystem... ({attempts}s)");
-            }
         }
 
-        if (!_epicMMOLoaded && ConfigEnableLogs.Value)
-        {
-            Logger.LogWarning("EpicMMOSystem not detected after waiting. VR UI fix will not be active.");
-        }
+        Logger.LogWarning("EpicMMOSystem not detected");
     }
 
     private void ApplyPatches()
     {
         try
         {
-            // Apply UI patches for main EpicMMO UI
             EpicMMOVRUI.PatchEpicMMOSystemUI(_harmony);
-
-            // Apply HUD patches for enemy/player level display
             EpicMMOVRHUD.Initialize(_harmony);
+            EpicMMOVRXPBar.Initialize(_harmony);
+            EpicMMOVRCrit.Initialize(_harmony);
 
-            if (ConfigEnableLogs.Value)
-                Logger.LogInfo("EpicMMOSystem VR UI and HUD patches applied successfully");
+            Logger.LogInfo("Patches applied");
         }
         catch (Exception e)
         {
-            Logger.LogError($"Error applying patches: {e}");
+            Logger.LogError($"Patch error: {e}");
         }
     }
 
@@ -111,32 +170,25 @@ public class EpicMMOVRUIPatch : BaseUnityPlugin
         _harmony?.UnpatchSelf();
     }
 
-    // Coroutine starter for static classes
     public new void StartCoroutine(IEnumerator routine)
     {
         base.StartCoroutine(routine);
     }
 
-    // Logging methods for static classes
-    public static void LogInfo(string message)
+    public static void LogInfo(string msg)
     {
         if (ConfigEnableLogs.Value)
-            _instance?.Logger.LogInfo(message);
+            _instance?.Logger.LogInfo(msg);
     }
 
-    public static void LogWarning(string message)
+    public static void LogWarning(string msg)
     {
         if (ConfigEnableLogs.Value)
-            _instance?.Logger.LogWarning(message);
+            _instance?.Logger.LogWarning(msg);
     }
 
-    public static void LogError(string message)
+    public static void LogError(string msg)
     {
-        _instance?.Logger.LogError(message);
-    }
-
-    public static void LogMessage(string message)
-    {
-        _instance?.Logger.LogMessage(message);
+        _instance?.Logger.LogError(msg);
     }
 }

@@ -1,228 +1,201 @@
 ﻿using HarmonyLib;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
+using System.Linq.Expressions;
 using UnityEngine;
 
 namespace EpicMMO
 {
     public static class EpicMMOVRHUD
     {
-        private static bool _isInitialized = false;
-        private static Harmony _harmony;
+        private static FieldInfo _characterLevelField;
 
-        // Caches
-        private static Dictionary<string, string> _nameCache = new Dictionary<string, string>();
-        private static Dictionary<string, int> _monsterLevelCache = new Dictionary<string, int>();
+        // Fast delegates (NO reflection at runtime)
+        private static Func<object, Character, object> _getEnemyHudFast;
+        private static Func<object, object> _getNameComponentFast;
+        private static Func<object, string> _getTextFast;
+        private static Action<object, string> _setTextFast;
 
-        // EpicMMOSystem type caches
-        private static Type _epicMMOSystemType;
-        private static Type _dataMonstersType;
-
-        // Method caches
+        // EpicMMO
         private static MethodInfo _containsMethod;
         private static MethodInfo _getLevelMethod;
 
-        // Config field caches
-        private static bool? _enabledLevelControl;
-        private static bool? _mobLvlPerStar;
-        private static string _mobLVLChars;
-        private static int _maxLevelExp;
-        private static int _minLevelExp;
-
-        // Reflection field for private m_level
-        private static FieldInfo _characterLevelField;
+        private static PropertyInfo _levelSystemInstance;
+        private static MethodInfo _getPlayerLevelMethod;
 
         public static void Initialize(Harmony harmony)
         {
-            if (_isInitialized) return;
-            _harmony = harmony;
-
-            // Cache reflection fields
-            _characterLevelField = typeof(Character).GetField("m_level", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            // Cache EpicMMOSystem types
-            _epicMMOSystemType = AccessTools.TypeByName("EpicMMOSystem.EpicMMOSystem");
-            _dataMonstersType = AccessTools.TypeByName("EpicMMOSystem.DataMonsters");
-
-            if (_dataMonstersType != null)
-            {
-                _containsMethod = AccessTools.Method(_dataMonstersType, "contains");
-                _getLevelMethod = AccessTools.Method(_dataMonstersType, "getLevel");
-            }
-
-            // Cache config values
-            CacheConfigValues();
-
-            ApplyVHVRPatches();
-            _isInitialized = true;
-        }
-
-        private static void CacheConfigValues()
-        {
             try
             {
-                if (_epicMMOSystemType != null)
-                {
-                    // Cache config fields using Traverse for safety
-                    var enabledLevelControlTraverse = Traverse.Create(_epicMMOSystemType).Field("enabledLevelControl");
-                    var mobLvlPerStarTraverse = Traverse.Create(_epicMMOSystemType).Field("mobLvlPerStar");
-                    var mobLVLCharsTraverse = Traverse.Create(_epicMMOSystemType).Field("MobLVLChars");
-                    var maxLevelExpTraverse = Traverse.Create(_epicMMOSystemType).Field("maxLevelExp");
-                    var minLevelExpTraverse = Traverse.Create(_epicMMOSystemType).Field("minLevelExp");
+                _characterLevelField = typeof(Character).GetField("m_level", BindingFlags.NonPublic | BindingFlags.Instance);
 
-                    // Use GetValue() without generic type to avoid casting issues
-                    _enabledLevelControl = enabledLevelControlTraverse.GetValue() as bool? ?? true;
-                    _mobLvlPerStar = mobLvlPerStarTraverse.GetValue() as bool? ?? false;
-                    _mobLVLChars = mobLVLCharsTraverse.GetValue() as string ?? "[@]";
-                    _maxLevelExp = maxLevelExpTraverse.GetValue() as int? ?? 5;
-                    _minLevelExp = minLevelExpTraverse.GetValue() as int? ?? 5;
-                }
-            }
-            catch (Exception e)
-            {
-                EpicMMOVRUIPatch.LogError($"Error caching config values: {e}");
-
-                // Set defaults if caching fails
-                _enabledLevelControl = true;
-                _mobLvlPerStar = false;
-                _mobLVLChars = "[@]";
-                _maxLevelExp = 5;
-                _minLevelExp = 5;
-            }
-        }
-
-        private static void ApplyVHVRPatches()
-        {
-            try
-            {
                 var enemyHudManagerType = AccessTools.TypeByName("ValheimVRMod.VRCore.UI.EnemyHudManager");
-                if (enemyHudManagerType == null) return;
+                var hudDataType = AccessTools.TypeByName("ValheimVRMod.VRCore.UI.EnemyHudManager+HudData");
+
+                if (enemyHudManagerType == null || hudDataType == null)
+                    return;
 
                 var updateNameMethod = AccessTools.Method(enemyHudManagerType, "UpdateName");
-                if (updateNameMethod != null)
+                var getHudMethod = AccessTools.Method(enemyHudManagerType, "getEnemyHud");
+
+                var nameField = AccessTools.Field(hudDataType, "name");
+
+                // --- BUILD FAST ACCESSORS ---
+
+                // getEnemyHud delegate
                 {
-                    _harmony.Patch(updateNameMethod,
-                        prefix: new HarmonyMethod(typeof(EpicMMOVRHUD), nameof(OnUpdateNamePrefix)));
+                    var instanceParam = Expression.Parameter(typeof(object), "instance");
+                    var charParam = Expression.Parameter(typeof(Character), "c");
+
+                    var castInstance = Expression.Convert(instanceParam, enemyHudManagerType);
+                    var call = Expression.Call(castInstance, getHudMethod, charParam);
+
+                    var convertResult = Expression.Convert(call, typeof(object));
+
+                    _getEnemyHudFast = Expression.Lambda<Func<object, Character, object>>(
+                        convertResult, instanceParam, charParam).Compile();
                 }
+
+                // get name component delegate
+                {
+                    var hudParam = Expression.Parameter(typeof(object), "hud");
+                    var castHud = Expression.Convert(hudParam, hudDataType);
+
+                    var field = Expression.Field(castHud, nameField);
+                    var convert = Expression.Convert(field, typeof(object));
+
+                    _getNameComponentFast = Expression.Lambda<Func<object, object>>(convert, hudParam).Compile();
+                }
+
+                // text property access
+                var textProp = nameField.FieldType.GetProperty("text");
+
+                {
+                    var objParam = Expression.Parameter(typeof(object), "obj");
+                    var cast = Expression.Convert(objParam, nameField.FieldType);
+                    var prop = Expression.Property(cast, textProp);
+
+                    _getTextFast = Expression.Lambda<Func<object, string>>(prop, objParam).Compile();
+                }
+
+                {
+                    var objParam = Expression.Parameter(typeof(object), "obj");
+                    var valueParam = Expression.Parameter(typeof(string), "val");
+
+                    var cast = Expression.Convert(objParam, nameField.FieldType);
+                    var prop = Expression.Property(cast, textProp);
+
+                    var assign = Expression.Assign(prop, valueParam);
+
+                    _setTextFast = Expression.Lambda<Action<object, string>>(assign, objParam, valueParam).Compile();
+                }
+
+                // --- EpicMMO ---
+                var dataMonstersType = AccessTools.TypeByName("EpicMMOSystem.DataMonsters");
+                if (dataMonstersType != null)
+                {
+                    _containsMethod = AccessTools.Method(dataMonstersType, "contains");
+                    _getLevelMethod = AccessTools.Method(dataMonstersType, "getLevel");
+                }
+
+                var levelSystemType = AccessTools.TypeByName("EpicMMOSystem.LevelSystem");
+                if (levelSystemType != null)
+                {
+                    _levelSystemInstance = AccessTools.Property(levelSystemType, "Instance");
+                    _getPlayerLevelMethod = AccessTools.Method(levelSystemType, "getLevel");
+                }
+
+                harmony.Patch(updateNameMethod,
+                    postfix: new HarmonyMethod(typeof(EpicMMOVRHUD), nameof(OnUpdateNamePostfix))
+                    {
+                        priority = Priority.High
+                    });
             }
             catch (Exception e)
             {
-                EpicMMOVRUIPatch.LogError($"Error applying VHVR patches: {e}");
+                Debug.LogError($"EpicMMO VR HUD init error: {e}");
             }
         }
 
-        private static void OnUpdateNamePrefix(object __instance, Character c, ref string name)
+        private static void OnUpdateNamePostfix(object __instance, Character c)
         {
             if (!EpicMMOVRUIPatch.ConfigEnableMod.Value) return;
             if (c == null) return;
-            if (_enabledLevelControl == false) return;
 
             try
             {
-                // Get character level using reflection
+                var hud = _getEnemyHudFast(__instance, c);
+                if (hud == null) return;
+
+                var nameComponent = _getNameComponentFast(hud);
+                if (nameComponent == null) return;
+
+                string currentText = _getTextFast(nameComponent);
+                if (string.IsNullOrEmpty(currentText)) return;
+
+                // Prevent duplicates
+                if (currentText.Contains("[") && currentText.Contains("]"))
+                    return;
+
                 int characterLevel = _characterLevelField != null ? (int)_characterLevelField.GetValue(c) : 1;
 
-                // Use cache key to avoid repeated processing
-                string cacheKey = $"{c.gameObject.name}|{name}|{characterLevel}";
+                int monsterLevel = GetMonsterLevel(c, characterLevel);
+                if (monsterLevel <= 0) return;
 
-                if (_nameCache.TryGetValue(cacheKey, out string cachedName))
-                {
-                    name = cachedName;
-                    return;
-                }
+                string color = GetLevelColor(monsterLevel);
+                string formatted = $"<color={color}>[{monsterLevel}]</color>";
 
-                var modifiedName = GetModifiedNameWithLevel(c, name, characterLevel);
-                if (modifiedName != name)
-                {
-                    _nameCache[cacheKey] = modifiedName;
-                    name = modifiedName;
-                }
+                _setTextFast(nameComponent, $"{currentText} {formatted}");
             }
-            catch
+            catch (Exception e)
             {
-                // Silently fail to avoid performance impact
+                Debug.LogError($"EpicMMO VR HUD Error: {e}");
             }
         }
 
-        private static string GetModifiedNameWithLevel(Character c, string originalName, int characterLevel)
+        private static int GetMonsterLevel(Character c, int characterLevel)
         {
-            if (c == null) return originalName;
-
             try
             {
-                // Check if monster exists in DataMonsters
-                if (_containsMethod == null || _getLevelMethod == null) return originalName;
+                if (_containsMethod == null || _getLevelMethod == null)
+                    return 0;
 
-                bool containsMonster = (bool)_containsMethod.Invoke(null, new object[] { c.gameObject.name });
-                if (!containsMonster) return originalName;
+                bool contains = (bool)_containsMethod.Invoke(null, new object[] { c.gameObject.name });
+                if (!contains) return 0;
 
-                // Get monster level
-                int monsterLevel = (int)_getLevelMethod.Invoke(null, new object[] { c.gameObject.name });
+                int level = (int)_getLevelMethod.Invoke(null, new object[] { c.gameObject.name });
 
-                // Apply star levels if configured
-                if (_mobLvlPerStar == true)
-                    monsterLevel += characterLevel - 1;
-
-                string mobLevelString = monsterLevel.ToString();
-
-                // Handle level 0 (unknown)
-                if (monsterLevel == 0)
-                    mobLevelString = "???";
-
-                // Apply color based on level difference
-                string colorTag = GetLevelColor(monsterLevel);
-
-                // Apply formatting
-                string levelFormat = _mobLVLChars ?? "[@]";
-                levelFormat = levelFormat.Replace("@", mobLevelString);
-
-                return $"{originalName} <color={colorTag}>{levelFormat}</color>";
+                return level + (characterLevel - 1);
             }
             catch
             {
-                return originalName;
+                return 0;
             }
         }
 
         private static string GetLevelColor(int monsterLevel)
         {
-            // Get player level (simplified - you might want to get this from EpicMMOSystem)
-            int playerLevel = 1; // Default
+            int playerLevel = 1;
 
             try
             {
-                // Try to get player level from EpicMMOSystem
-                var levelSystemType = AccessTools.TypeByName("EpicMMOSystem.LevelSystem");
-                if (levelSystemType != null)
+                var instance = _levelSystemInstance?.GetValue(null);
+                if (instance != null && _getPlayerLevelMethod != null)
                 {
-                    var instanceProperty = AccessTools.Property(levelSystemType, "Instance");
-                    var getLevelMethod = AccessTools.Method(levelSystemType, "getLevel");
-
-                    if (instanceProperty != null && getLevelMethod != null)
-                    {
-                        var instance = instanceProperty.GetValue(null);
-                        if (instance != null)
-                        {
-                            playerLevel = (int)getLevelMethod.Invoke(instance, null);
-                        }
-                    }
+                    playerLevel = (int)_getPlayerLevelMethod.Invoke(instance, null);
                 }
             }
-            catch
-            {
-                // If we can't get player level, use default
-            }
+            catch { }
 
-            int maxLevelExp = playerLevel + _maxLevelExp;
-            int minLevelExp = playerLevel - _minLevelExp;
+            int max = playerLevel + 5;
+            int min = playerLevel - 5;
 
-            if (monsterLevel > maxLevelExp)
-                return "red";
-            else if (monsterLevel < minLevelExp)
-                return "#2FFFDC"; // Cyan
+            if (monsterLevel > max)
+                return "#FF0000";
+            else if (monsterLevel < min)
+                return "#2FFFDC";
             else
-                return "white";
+                return "#FFFFFF";
         }
     }
 }
