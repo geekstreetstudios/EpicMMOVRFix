@@ -2,60 +2,138 @@
 
 A compatibility fix that makes the EpicMMO mod's user interface properly visible and functional in Valheim VR.
 
-## Features
+---
 
-- Makes EpicMMO's level UI visible in VR
-- Ensures enemy level displays work correctly in VR
-- Maintains all EpicMMO functionality
-- Non-intrusive - doesn't modify original EpicMMO files
+## 🚀 Features
 
-## Installation
+- ✅ Full **EpicMMO UI support in VR**
+- ✅ Enemy level display works correctly in VR HUD
+- ✅ **XP Bar moved into Inventory (VR-friendly)**
+- ✅ Optional fallback to standard HUD XP bar
+- ✅ **Configurable XP bar position & scale (Inventory + HUD)**
+- ✅ **VR-compatible critical damage numbers**
+  - Uses VR-native floating text
+  - Includes black outline for readability
+- ✅ Automatic recovery after:
+  - Death / respawn
+  - Scene changes
+  - UI reloads
+- ✅ Non-intrusive — does NOT modify EpicMMO files
 
-1. Install [BepInEx](https://valheim.thunderstore.io/package/denikson/BepInExPack_Valheim/)
-2. Install [Valheim VR Mod (VHVR)
-3. Install [EpicMMO](https://thunderstore.io/c/valheim/p/WackyMole/WackyEpicMMOSystem/)
-4. Install this mod
+---
 
-## Usage
+## 📦 Installation
 
-The mod works automatically! Once installed:
-- Press `Inventory` to open the EpicMMO level UI
-- Enemy levels will display above their heads in VR
-- Force Old-XP bar should be enabled in EpicMMO
-## How it Works
+1. Install :contentReference[oaicite:0]{index=0}  
+2. Install Valheim VR Mod (VHVR)  
+3. Install :contentReference[oaicite:1]{index=1}  
+4. Install **EpicMMOVRFix**
 
-This mod acts as a bridge between EpicMMO and Valheim VR Mod (VHVR). It detects when EpicMMO UI elements are shown and ensures they're properly processed by VHVR's VR rendering system for correct positioning and visibility.
+---
 
-## Compatibility
+## 🎮 Usage
 
-- Requires EpicMMO 1.5.11 or newer
-- Requires Valheim VR Mod
-- Compatible with other VR UI fixes
+The mod works automatically.
 
-## Known Issues
-- Other players level may not appear
-- The XP bar is fixed in the lower left corner
+### Default Behavior
+- Open **Inventory** → XP bar appears inside VR UI
+- Close Inventory → XP bar returns to HUD (if enabled)
 
-## Configuration
+### Important
+- ⚠️ **"Force Old XP Bar" MUST be enabled** in EpicMMO  
+  (This mod depends on it for stability)
 
-The mod includes optional configuration:
-- Enable/disable the VR fix
-- Toggle debug logging for troubleshooting
+---
 
-## Troubleshooting
+## ⚙️ Configuration
 
-If UI elements don't appear:
+Config file allows full control:
+
+### XP Bar (Inventory Mode)
+- `EnableInventoryXPBar` (default: true)
+- `InventoryXPBarPosX` (default: 500)
+- `InventoryXPBarPosY` (default: 650)
+- `InventoryXPBarScale`
+
+### XP Bar (HUD Mode)
+- `HudXPBarPosX`
+- `HudXPBarPosY`
+- `HudXPBarScale`
+
+### General
+- Enable/disable mod
+- Enable debug logging
+
+### 🔄 Live Config
+- Changes apply **immediately in-game**
+- No restart required
+
+---
+
+## 🧠 How it Works
+
+This mod acts as a **bridge between EpicMMO and Valheim VR (VHVR)**:
+
+- Converts EpicMMO UI into **VR-compatible world space canvases**
+- Repositions UI elements (like XP bar) into VR-friendly locations
+- Replaces incompatible systems:
+  - ❌ TMP damage text → ✅ VRDamageTexts
+- Uses **event-driven updates** (not polling) for performance
+
+---
+
+## ⚡ Performance
+
+Designed for **heavy mod setups (100+ mods)**:
+
+- No constant update loops
+- Minimal reflection usage
+- UI updates triggered only when needed:
+  - Inventory open/close
+  - Player spawn
+- Eliminates UI spam and stutter
+
+---
+
+## 🔧 Compatibility
+
+- ✔ Requires EpicMMO 1.5.11+
+- ✔ Requires Valheim VR Mod (VHVR)
+- ✔ Works alongside other VR UI mods
+- ✔ Safe for multiplayer
+
+---
+
+## ⚠️ Known Issues
+
+- Other player levels may not always display in VR
+- XP bar positioning may need manual adjustment depending on UI scale mods
+
+---
+
+## 🛠 Troubleshooting
+
+If something isn’t working:
+
 1. Verify EpicMMO works in flatscreen first
-2. Check all dependencies are installed correctly
-3. Ensure you're running the latest versions
-4. Enable debug logging in config for more information
+2. Ensure **Old XP Bar is enabled**
+3. Check all dependencies are installed
+4. Enable debug logs in config
+5. Open inventory once to force UI refresh
 
-## Source Code
+---
 
-Available on [GitHub](https://github.com/geekstreetstudios/EpicMMOVRFix)
+## 📂 Source Code
 
-## Credits
+Available on GitHub:  
+https://github.com/geekstreetstudios/EpicMMOVRFix
 
-- Thanks to WackyMole for EpicMMO
-- Thanks to the Valheim VR Mod team
-- Thanks to the Valheim modding community
+---
+
+## 🙌 Credits
+
+- WackyMole — EpicMMO  
+- Valheim VR Mod Team  
+- Valheim modding community  
+
+---
